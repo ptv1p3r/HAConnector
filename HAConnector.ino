@@ -25,9 +25,11 @@ SoftwareSerial soft(PIN_RX, PIN_TX); // RX, TX
 WiFiEspClient espClient;
 PubSubClient client(espClient);
 
-String sPayload;
-char* cPayload;
+//unsigned long time;
+//String sPayload;
+//char* cPayload;
 char buffer[256];
+const char* clientID = "ArduinoESP8266";
 
 void setup() {
   Serial.begin(9600); // initialize serial
@@ -35,10 +37,8 @@ void setup() {
   WiFi.init(&soft);   // initialize ESP module
 
   const int capacity = JSON_OBJECT_SIZE(7);
-  
   StaticJsonDocument<capacity> payload;
 
-    
   payload["~"] = "homeassistant/light/office";
   payload["name"] = "Office Light";
   payload["unique_id"] = "office_light_1";
@@ -48,8 +48,6 @@ void setup() {
   payload["brightness"] = true;
 
   serializeJson(payload, buffer);
-
-//  Serial.print("AQUI; " + buffer);
   
   // check for the presence of the module
   if (WiFi.status() == WL_NO_SHIELD) {
@@ -81,9 +79,15 @@ void Wifi_Setup(){
 
 //print any message received for subscribed topic
 void callback(char* topic, byte* payload, unsigned int length) {
-  StaticJsonDocument<256> doc;
-  deserializeJson(doc, payload, length);
-  JsonObject root = doc.as<JsonObject>();
+
+  buffer[0] = '\0'; // elimna o conteudo do array
+  //buffer[0] = (char)0;
+  
+  Serial.print(buffer);
+  
+  StaticJsonDocument<256> doc2;
+  deserializeJson(doc2, payload, length);
+  JsonObject root = doc2.as<JsonObject>();
   
   Serial.print("Message arrived [");
   Serial.print(topic);
@@ -94,6 +98,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.println(p.key().c_str()); // is a JsonString
     Serial.println(p.value().as<char*>()); // is a JsonVariant
   }
+
+  // action for topic
+  if(strcmp(topic, LED_STRIP_SET) == 0){
+    
+    const int capacity = JSON_OBJECT_SIZE(2);
+    StaticJsonDocument<capacity> payload2;
+
+    payload2["state"] = "ON";
+    payload2["brightness"] = 255;
+
+    serializeJson(payload2, buffer);
+    //Serial.print(buffer);
+    client.publish(LED_STRIP_STATE,buffer);
+  }
+
   
   Serial.println();
 }
@@ -118,16 +137,15 @@ void reconnect() {
     
     Serial.print("Attempting MQTT connection...");  // Attempt to connect, just a name to identify the client
     
-    if (client.connect("arduinoClient")) {
+    if (client.connect(clientID)) {
       Serial.println("connected");
-      // Once connected, publish an announcement...
-      client.publish(LED_STRIP_CONFIG,buffer);
-      // ... and resubscribe
-      client.subscribe(LED_STRIP_SET);
+      client.publish(LED_STRIP_CONFIG,buffer);  // Once connected, publish an announcement...
+      client.subscribe(LED_STRIP_SET);  // ... and resubscribe
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
+      
       // Wait 5 seconds before retrying
       delay(5000);
     }
