@@ -83,7 +83,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   buffer[0] = '\0'; // elimna o conteudo do array
   //buffer[0] = (char)0;
   
-  Serial.print(buffer);
+  Serial.print((char)payload);
   
   StaticJsonDocument<256> doc2;
   deserializeJson(doc2, payload, length);
@@ -111,6 +111,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     serializeJson(payload2, buffer);
     //Serial.print(buffer);
     client.publish(LED_STRIP_STATE,buffer);
+
   }
 
   

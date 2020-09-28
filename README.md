@@ -1,2 +1,2 @@
 # HAConnector
-Arduino ESP8266 Connector to MQQT server for Home Assistant
+Arduino ESP8266 Connector to MQTT server for Home Assistant
