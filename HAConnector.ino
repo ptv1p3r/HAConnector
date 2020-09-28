@@ -11,14 +11,14 @@ int status = WL_IDLE_STATUS;        // Wifi radio's status
 #define LED_STRIP_STATE "homeassistant/light/office/set"
 #define LED_STRIP_CONFIG "homeassistant/light/office/config"
 #define LED_STRIP_SET "homeassistant/light/office/set"
-#define PIN_RX = 10
-#define PIN_TX = 11
+#define PIN_RX 10
+#define PIN_TX 11
 
 // Initialize the Ethernet client object
 IPAddress server(192, 168, 2, 221);
 WiFiEspClient espClient;
 PubSubClient client(espClient);
-SoftwareSerial soft(10,11); // RX, TX
+SoftwareSerial soft(PIN_RX,PIN_TX); // RX, TX
 
 void setup() {
   // initialize serial for debugging
