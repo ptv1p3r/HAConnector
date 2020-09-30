@@ -7,8 +7,9 @@
 char ssid[] = "Vipernet";           // network SSID
 char pass[] = "nadlor290228";       // network password
 int status = WL_IDLE_STATUS;        // Wifi radio's status
-IPAddress server(192, 168, 2, 221); // MQTT server address
+IPAddress MQTT_SERVER(192, 168, 2, 221); // MQTT server address
 
+//const char * LED_STRIP_STATE = "homeassistant/light/office/state";
 #define LED_STRIP_STATE "homeassistant/light/office/state"
 #define LED_STRIP_CONFIG "homeassistant/light/office/config"
 #define LED_STRIP_SET "homeassistant/light/office/set"
@@ -23,7 +24,7 @@ SoftwareSerial soft(PIN_RX, PIN_TX); // RX, TX
 #endif
 
 WiFiEspClient espClient;
-PubSubClient client(espClient);
+PubSubClient mqttClient(espClient);
 
 //unsigned long time;
 //String sPayload;
@@ -34,7 +35,9 @@ const char* clientID = "ArduinoESP8266";
 void setup() {
   Serial.begin(9600); // initialize serial
   soft.begin(9600);   // initialize serial for ESP module
-  WiFi.init(&soft);   // initialize ESP module
+
+  Wifi_Setup(); // wifi ESP8266 setup
+  Mqtt_Setup(); // mqtt (mosquitto) setup
 
   const int capacity = JSON_OBJECT_SIZE(7);
   StaticJsonDocument<capacity> payload;
@@ -48,7 +51,19 @@ void setup() {
   payload["brightness"] = true;
 
   serializeJson(payload, buffer);
-  
+
+}
+
+void Mqtt_Setup(){
+    //connect to MQTT server
+  mqttClient.setServer(MQTT_SERVER, 1883);
+  mqttClient.setCallback(callback);
+}
+
+
+void Wifi_Setup(){
+  WiFi.init(&soft);   // initialize ESP module
+
   // check for the presence of the module
   if (WiFi.status() == WL_NO_SHIELD) {
     Serial.println("WiFi module not present");
@@ -58,30 +73,24 @@ void setup() {
 
   // Connect to WiFi network
   while ( status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to WPA SSID: ");
+    Serial.print("Attempting to connect to SSID: ");
     Serial.println(ssid);
     // Connect to WPA/WPA2 network
     status = WiFi.begin(ssid, pass);
   }
 
   // Wifi is connected
-  Serial.println("You're connected to the network");
-
-  //connect to MQTT server
-  client.setServer(server, 1883);
-  client.setCallback(callback);
-}
-
-void Wifi_Setup(){
-  
+  Serial.print("Connected to: ");
+  Serial.println(ssid);
 }
 
 
 //print any message received for subscribed topic
 void callback(char* topic, byte* payload, unsigned int length) {
-
-  buffer[0] = '\0'; // elimna o conteudo do array
+  //buffer[0] = '\0'; // elimna o conteudo do array
   //buffer[0] = (char)0;
+  
+  memset(buffer, 0, sizeof(buffer));
   
   Serial.print((char)payload);
   
@@ -101,16 +110,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   // action for topic
   if(strcmp(topic, LED_STRIP_SET) == 0){
+
+     mqttClient.publish(LED_STRIP_STATE, "teste:ON");
     
-    const int capacity = JSON_OBJECT_SIZE(2);
-    StaticJsonDocument<capacity> payload2;
+    const int capacity2 = JSON_OBJECT_SIZE(2);
+    StaticJsonDocument<capacity2> payload3;
 
-    payload2["state"] = "ON";
-    payload2["brightness"] = 255;
+    payload3["state"] = "ON";
+    payload3["brightness"] = "255";
 
-    serializeJson(payload2, buffer);
-    //Serial.print(buffer);
-    client.publish(LED_STRIP_STATE,buffer);
+    serializeJson(payload3, buffer);
+    Serial.print(buffer);
+    //mqttClient.publish(LED_STRIP_STATE, "{'state':'ON','brightness':255}", true);
+    mqttClient.publish(LED_STRIP_STATE,buffer);
 
   }
 
@@ -119,10 +131,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void loop() {
-  if (!client.connected()) {
+  if (!mqttClient.connected()) {
     reconnect();
   }
-  client.loop();
+  mqttClient.loop();
 
   // mqqt test
   //client.publish(out_topic, String(random(2)).c_str(), true);
@@ -134,17 +146,18 @@ void loop() {
 
 void reconnect() {
   // Loop until we're reconnected
-  while (!client.connected()) {
+  while (!mqttClient.connected()) {
     
     Serial.print("Attempting MQTT connection...");  // Attempt to connect, just a name to identify the client
     
-    if (client.connect(clientID)) {
+    if (mqttClient.connect(clientID)) {
       Serial.println("connected");
-      client.publish(LED_STRIP_CONFIG,buffer);  // Once connected, publish an announcement...
-      client.subscribe(LED_STRIP_SET);  // ... and resubscribe
+      mqttClient.publish(LED_STRIP_CONFIG, buffer);  // Once connected, publish an announcement...
+      mqttClient.subscribe(LED_STRIP_SET);  // ... and resubscribe
+      //mqttClient.subscribe(LED_STRIP_STATE);  // ... and resubscribe
     } else {
       Serial.print("failed, rc=");
-      Serial.print(client.state());
+      Serial.print(mqttClient.state());
       Serial.println(" try again in 5 seconds");
       
       // Wait 5 seconds before retrying
