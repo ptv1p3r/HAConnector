@@ -9,7 +9,7 @@ char pass[] = "nadlor290228";       // network password
 int status = WL_IDLE_STATUS;        // Wifi radio's status
 IPAddress MQTT_SERVER(192, 168, 2, 221); // MQTT server address
 
-//const char * LED_STRIP_STATE = "homeassistant/light/office/state";
+//const char * LED_STRIP_STATE2 = "homeassistant/light/office/state";
 #define LED_STRIP_STATE "homeassistant/light/office/state"
 #define LED_STRIP_CONFIG "homeassistant/light/office/config"
 #define LED_STRIP_SET "homeassistant/light/office/set"
@@ -26,9 +26,6 @@ SoftwareSerial soft(PIN_RX, PIN_TX); // RX, TX
 WiFiEspClient espClient;
 PubSubClient mqttClient(espClient);
 
-//unsigned long time;
-//String sPayload;
-//char* cPayload;
 char buffer[256];
 const char* clientID = "ArduinoESP8266";
 
@@ -55,7 +52,7 @@ void setup() {
 }
 
 void Mqtt_Setup(){
-    //connect to MQTT server
+  //connect to MQTT server
   mqttClient.setServer(MQTT_SERVER, 1883);
   mqttClient.setCallback(callback);
 }
@@ -89,41 +86,48 @@ void Wifi_Setup(){
 void callback(char* topic, byte* payload, unsigned int length) {
   //buffer[0] = '\0'; // elimna o conteudo do array
   //buffer[0] = (char)0;
+  String response;
   
   memset(buffer, 0, sizeof(buffer));
+    
+  for (int i = 0; i < length; i++) {
+    response += (char)payload[i];
+  }
+
+  Serial.print("#####################");
+  Serial.print(response);
+  Serial.println("#####################");
   
-  Serial.print((char)payload);
-  
-  StaticJsonDocument<256> doc2;
+  /*StaticJsonDocument<256> doc2;
   deserializeJson(doc2, payload, length);
   JsonObject root = doc2.as<JsonObject>();
   
-  Serial.print("Message arrived [");
+  Serial.println("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
+  
   //for (int i=0;i<length;i++) {
   //  Serial.print((char)payload[i]);
   for (JsonPair p : root) {
     Serial.println(p.key().c_str()); // is a JsonString
     Serial.println(p.value().as<char*>()); // is a JsonVariant
-  }
+  }*/
 
   // action for topic
   if(strcmp(topic, LED_STRIP_SET) == 0){
 
-     mqttClient.publish(LED_STRIP_STATE, "teste:ON");
-    
-    const int capacity2 = JSON_OBJECT_SIZE(2);
-    StaticJsonDocument<capacity2> payload3;
+    const int capacity = JSON_OBJECT_SIZE(2);
+    StaticJsonDocument<capacity> mqttPayload;
 
-    payload3["state"] = "ON";
-    payload3["brightness"] = "255";
+    mqttPayload["state"] = "ON";
+    mqttPayload["brightness"] = 255;
 
-    serializeJson(payload3, buffer);
-    Serial.print(buffer);
-    //mqttClient.publish(LED_STRIP_STATE, "{'state':'ON','brightness':255}", true);
-    mqttClient.publish(LED_STRIP_STATE,buffer);
+    serializeJson(mqttPayload, buffer);
 
+    Serial.print("Print mqtt data buffer: ");
+    Serial.println(buffer);
+
+    mqttClient.publish("homeassistant/light/office/state", buffer);
   }
 
   
@@ -151,10 +155,13 @@ void reconnect() {
     Serial.print("Attempting MQTT connection...");  // Attempt to connect, just a name to identify the client
     
     if (mqttClient.connect(clientID)) {
-      Serial.println("connected");
+      Serial.println("connected to mqtt Server");
+      Serial.print("Sending Auto Discovery: ");
+      Serial.println(LED_STRIP_CONFIG);
       mqttClient.publish(LED_STRIP_CONFIG, buffer);  // Once connected, publish an announcement...
+      Serial.print("Listening on topic: ");
+      Serial.println(LED_STRIP_SET);
       mqttClient.subscribe(LED_STRIP_SET);  // ... and resubscribe
-      //mqttClient.subscribe(LED_STRIP_STATE);  // ... and resubscribe
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
