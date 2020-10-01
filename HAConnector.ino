@@ -26,7 +26,7 @@ SoftwareSerial soft(PIN_RX, PIN_TX); // RX, TX
 WiFiEspClient espClient;
 PubSubClient mqttClient(espClient);
 
-char buffer[256];
+char mqttPayloadBuffer[256];
 const char* clientID = "ArduinoESP8266";
 
 void setup() {
@@ -50,7 +50,7 @@ void setup() {
   payload["schema"] = "json";
   payload["brightness"] = true;
 
-  serializeJson(payload, buffer);
+  serializeJson(payload, mqttPayloadBuffer);
 
 }
 
@@ -66,21 +66,21 @@ void Wifi_Setup(){
 
   // check for the presence of the module
   if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("WiFi module not present");
+    Serial.println(F("WiFi module not present"));
     // stop
     while (true);
   }
 
   // Connect to WiFi network
   while ( status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to SSID: ");
+    Serial.print(F("Attempting to connect to SSID: "));
     Serial.println(ssid);
     // Connect to WPA/WPA2 network
     status = WiFi.begin(ssid, pass);
   }
 
   // Wifi is connected
-  Serial.print("Connected to: ");
+  Serial.print(F("Connected to: "));
   Serial.println(ssid);
 }
 
@@ -107,7 +107,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   const char* state = root["state"];
   //Serial.println(state);
   
-  memset(buffer, 0, sizeof(buffer)); // clear data buffer
+  memset(mqttPayloadBuffer, 0, sizeof(mqttPayloadBuffer)); // clear data buffer
   
   // action for topic
   if(strcmp(topic, LED_STRIP_SET) == 0){
@@ -123,16 +123,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
     mqttPayload["brightness"] = 255;
 
     //serializeJson(mqttPayload, buffer);
-    serializeJsonPretty(mqttPayload, buffer);
+    serializeJsonPretty(mqttPayload, mqttPayloadBuffer);
 
-    Serial.print("Print mqtt data buffer: ");
-    Serial.println(buffer);
-    Serial.print("Publishing on topic: ");
+    Serial.print(F("Print mqtt data buffer: "));
+    Serial.println(mqttPayloadBuffer);
+    Serial.print(F("Publishing on topic: "));
     Serial.println(LED_STRIP_STATE);
-    mqttClient.publish(LED_STRIP_STATE, buffer);
+    mqttClient.publish(LED_STRIP_STATE, mqttPayloadBuffer, true);
   }
 
-  
   Serial.println();
 }
 
@@ -147,20 +146,20 @@ void reconnect() {
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
     
-    Serial.print("Attempting MQTT connection...");  // Attempt to connect, just a name to identify the client
+    Serial.print(F("Attempting MQTT connection..."));  // Attempt to connect, just a name to identify the client
     
     if (mqttClient.connect(clientID)) {
-      Serial.println("connected to mqtt Server");
-      Serial.print("Sending Auto Discovery: ");
+      Serial.println(F("connected to mqtt Server"));
+      Serial.print(F("Sending Auto Discovery: "));
       Serial.println(LED_STRIP_CONFIG);
-      mqttClient.publish(LED_STRIP_CONFIG, buffer);  // Once connected, publish an announcement...
-      Serial.print("Listening on topic: ");
+      mqttClient.publish(LED_STRIP_CONFIG, mqttPayloadBuffer);  // Once connected, publish an announcement...
+      Serial.print(F("Listening on topic: "));
       Serial.println(LED_STRIP_SET);
       mqttClient.subscribe(LED_STRIP_SET);  // ... and resubscribe
     } else {
-      Serial.print("failed, rc=");
+      Serial.print(F("failed, rc="));
       Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
+      Serial.println(F(" try again in 5 seconds"));
       
       // Wait 5 seconds before retrying
       delay(5000);
