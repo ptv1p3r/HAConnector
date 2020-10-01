@@ -9,10 +9,10 @@ char pass[] = "nadlor290228";       // network password
 int status = WL_IDLE_STATUS;        // Wifi radio's status
 IPAddress MQTT_SERVER(192, 168, 2, 221); // MQTT server address
 
-//const char * LED_STRIP_STATE2 = "homeassistant/light/office/state";
 #define LED_STRIP_STATE "homeassistant/light/office/state"
 #define LED_STRIP_CONFIG "homeassistant/light/office/config"
 #define LED_STRIP_SET "homeassistant/light/office/set"
+
 #define PIN_RX 10
 #define PIN_TX 11
 
@@ -34,8 +34,11 @@ void setup() {
   soft.begin(9600);   // initialize serial for ESP module
 
   Wifi_Setup(); // wifi ESP8266 setup
+  delay(1000);
   Mqtt_Setup(); // mqtt (mosquitto) setup
 
+  delay(5000);  // Delay to allow interface to autoconfigure
+  
   const int capacity = JSON_OBJECT_SIZE(7);
   StaticJsonDocument<capacity> payload;
 
@@ -86,48 +89,47 @@ void Wifi_Setup(){
 void callback(char* topic, byte* payload, unsigned int length) {
   //buffer[0] = '\0'; // elimna o conteudo do array
   //buffer[0] = (char)0;
-  String response;
-  
-  memset(buffer, 0, sizeof(buffer));
-    
-  for (int i = 0; i < length; i++) {
-    response += (char)payload[i];
+  //memcpy(received_payload, payload, length); // copy payload
+   
+  // handle message arrived
+  /*char inData[128];
+  Serial.print("payload: ");
+  for(int i =0; i<length; i++){
+    //Serial.print((char)payload[i]);
+    inData[i]= (char)payload[i];
+    Serial.print(inData[i]);
   }
+  Serial.println("");*/
 
-  Serial.print("#####################");
-  Serial.print(response);
-  Serial.println("#####################");
+  StaticJsonDocument<10> doc;
+  deserializeJson(doc, payload,length);
+  JsonObject root = doc.as<JsonObject>();
+  const char* state = root["state"];
+  //Serial.println(state);
   
-  /*StaticJsonDocument<256> doc2;
-  deserializeJson(doc2, payload, length);
-  JsonObject root = doc2.as<JsonObject>();
+  memset(buffer, 0, sizeof(buffer)); // clear data buffer
   
-  Serial.println("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  
-  //for (int i=0;i<length;i++) {
-  //  Serial.print((char)payload[i]);
-  for (JsonPair p : root) {
-    Serial.println(p.key().c_str()); // is a JsonString
-    Serial.println(p.value().as<char*>()); // is a JsonVariant
-  }*/
-
   // action for topic
   if(strcmp(topic, LED_STRIP_SET) == 0){
 
     const int capacity = JSON_OBJECT_SIZE(2);
     StaticJsonDocument<capacity> mqttPayload;
 
-    mqttPayload["state"] = "ON";
+    if(strcmp("ON", state) == 0){
+      mqttPayload["state"] = "ON";  
+    } else {
+      mqttPayload["state"] = "OFF";  
+    } 
     mqttPayload["brightness"] = 255;
 
-    serializeJson(mqttPayload, buffer);
+    //serializeJson(mqttPayload, buffer);
+    serializeJsonPretty(mqttPayload, buffer);
 
     Serial.print("Print mqtt data buffer: ");
     Serial.println(buffer);
-
-    mqttClient.publish("homeassistant/light/office/state", buffer);
+    Serial.print("Publishing on topic: ");
+    Serial.println(LED_STRIP_STATE);
+    mqttClient.publish(LED_STRIP_STATE, buffer);
   }
 
   
@@ -139,13 +141,6 @@ void loop() {
     reconnect();
   }
   mqttClient.loop();
-
-  // mqqt test
-  //client.publish(out_topic, String(random(2)).c_str(), true);
-  //delay(1000);
-  //client.subscribe(in_topic);
-  //delay(1000);
-  
 }
 
 void reconnect() {
