@@ -12,7 +12,8 @@ IPAddress MQTT_SERVER(192, 168, 2, 221); // MQTT server address
 #define LED_STRIP_STATE "homeassistant/light/office/state"
 #define LED_STRIP_CONFIG "homeassistant/light/office/config"
 #define LED_STRIP_SET "homeassistant/light/office/set"
-
+#define MQTT_MAX_PACKET_SIZE 327
+#define DEBUG
 #define PIN_RX 10
 #define PIN_TX 11
 
@@ -39,8 +40,14 @@ void setup() {
 
   delay(5000);  // Delay to allow interface to autoconfigure
   
-  const int capacity = JSON_OBJECT_SIZE(7);
+  Discovery_Init();
+}
+
+void Discovery_Init(){
+
+  const int capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(7);
   StaticJsonDocument<capacity> payload;
+  //DynamicJsonDocument payload(capacity);
 
   payload["~"] = "homeassistant/light/office";
   payload["name"] = "Office Light";
@@ -48,10 +55,16 @@ void setup() {
   payload["cmd_t"] = "~/set";
   payload["stat_t"] = "~/state";
   payload["schema"] = "json";
-  payload["brightness"] = true;
+  //payload["brightness"] = true;
+  JsonObject device = payload.createNestedObject("dev");
+  JsonArray identifiers = device.createNestedArray("ids");
+  identifiers.add("led_1");  
+  device["name"] = "ledstrip";
+  device["mdl"] = "StripController";
+  device["mf"] = "OpenmindSoftware";
 
-  serializeJson(payload, mqttPayloadBuffer);
-
+  serializeJson(payload, mqttPayloadBuffer, sizeof(mqttPayloadBuffer));
+  //serializeJsonPretty(payload, mqttPayloadBuffer);
 }
 
 void Mqtt_Setup(){
@@ -105,7 +118,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   deserializeJson(doc, payload,length);
   JsonObject root = doc.as<JsonObject>();
   const char* state = root["state"];
-  //Serial.println(state);
+  #ifdef DEBUG
+    Serial.println(state);
+  #endif
   
   memset(mqttPayloadBuffer, 0, sizeof(mqttPayloadBuffer)); // clear data buffer
   
@@ -125,10 +140,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
     //serializeJson(mqttPayload, buffer);
     serializeJsonPretty(mqttPayload, mqttPayloadBuffer);
 
-    Serial.print(F("Print mqtt data buffer: "));
-    Serial.println(mqttPayloadBuffer);
-    Serial.print(F("Publishing on topic: "));
-    Serial.println(LED_STRIP_STATE);
+    #ifdef DEBUG
+      Serial.print(F("Print mqtt data buffer: "));
+      Serial.println(mqttPayloadBuffer);
+      Serial.print(F("Publishing on topic: "));
+      Serial.println(LED_STRIP_STATE);
+    #endif
+    
     mqttClient.publish(LED_STRIP_STATE, mqttPayloadBuffer, true);
   }
 
@@ -145,18 +163,30 @@ void loop() {
 void reconnect() {
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
-    
-    Serial.print(F("Attempting MQTT connection..."));  // Attempt to connect, just a name to identify the client
+
+    #ifdef DEBUG
+      Serial.print(F("Attempting MQTT connection..."));  // Attempt to connect, just a name to identify the client
+    #endif
     
     if (mqttClient.connect(clientID)) {
-      Serial.println(F("connected to mqtt Server"));
-      Serial.print(F("Sending Auto Discovery: "));
-      Serial.println(LED_STRIP_CONFIG);
+      #ifdef DEBUG
+        Serial.println(F("connected to mqtt Server"));
+        Serial.print(F("Sending Auto Discovery: "));
+        Serial.println(LED_STRIP_CONFIG);
+        Serial.print(F("mqtt Auto Discovery: "));
+        Serial.println(mqttPayloadBuffer);
+      #endif
+        
       mqttClient.publish(LED_STRIP_CONFIG, mqttPayloadBuffer);  // Once connected, publish an announcement...
-      Serial.print(F("Listening on topic: "));
-      Serial.println(LED_STRIP_SET);
+
+      #ifdef DEBUG
+        Serial.print(F("Listening on topic: "));
+        Serial.println(LED_STRIP_SET);
+      #endif
+      
       mqttClient.subscribe(LED_STRIP_SET);  // ... and resubscribe
     } else {
+      
       Serial.print(F("failed, rc="));
       Serial.print(mqttClient.state());
       Serial.println(F(" try again in 5 seconds"));
